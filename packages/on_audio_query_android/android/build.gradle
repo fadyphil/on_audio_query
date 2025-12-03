@@ -35,8 +35,7 @@ android {
     defaultConfig {
         minSdkVersion 16
     }
-}
-compileOptions {
+    compileOptions {
         sourceCompatibility JavaVersion.VERSION_1_8
         targetCompatibility JavaVersion.VERSION_1_8
     }
@@ -44,6 +43,8 @@ compileOptions {
     kotlinOptions {
         jvmTarget = '1.8'
     }
+}
+
 dependencies {
     def lifecycle_version = "2.3.1"
     implementation 'org.jetbrains.kotlinx:kotlinx-coroutines-core:1.6.4'
