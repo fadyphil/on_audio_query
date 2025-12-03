@@ -25,6 +25,8 @@ apply plugin: 'com.android.library'
 apply plugin: 'kotlin-android'
 
 android {
+    namespace 'com.lucasjosino.on_audio_query' // <--- I ADDED THIS LINE
+
     compileSdkVersion 33
 
     sourceSets {
