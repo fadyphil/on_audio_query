@@ -63,39 +63,59 @@ class AudioQuery : ViewModel() {
 
         // Query everything in background for a better performance.
         viewModelScope.launch {
-            val queryResult = loadSongs()
-            result.success(queryResult)
+            try {
+                // 1. Load the songs
+                val queryResult = loadSongs()
+
+                // 2. Try to send the result. 
+                // If the plugin already sent an error (due to permissions), 
+                // this try-catch prevents the "Reply already submitted" crash.
+                try {
+                    result.success(queryResult)
+                } catch (e: Exception) {
+                    Log.w(TAG, "Result already submitted or channel closed: ${e.message}")
+                }
+            } catch (e: Exception) {
+                Log.e(TAG, "Unknown error in querySongs: ${e.message}")
+            }
         }
     }
 
     //Loading in Background
     private suspend fun loadSongs(): ArrayList<MutableMap<String, Any?>> =
         withContext(Dispatchers.IO) {
-            // Setup the cursor with 'uri', 'projection' and 'sortType'.
-            val cursor = resolver.query(uri, songProjection(), selection, null, sortType)
-
             val songList: ArrayList<MutableMap<String, Any?>> = ArrayList()
 
-            Log.d(TAG, "Cursor count: ${cursor?.count}")
+            // 3. Added safety check for the query itself. 
+            // If permissions are missing, resolver.query() can sometimes throw a SecurityException.
+            try {
+                // Setup the cursor with 'uri', 'projection' and 'sortType'.
+                val cursor = resolver.query(uri, songProjection(), selection, null, sortType)
 
-            // For each item(song) inside this "cursor", take one and "format"
-            // into a 'Map<String, dynamic>'.
-            while (cursor != null && cursor.moveToNext()) {
-                val tempData: MutableMap<String, Any?> = HashMap()
+                Log.d(TAG, "Cursor count: ${cursor?.count}")
 
-                for (audioMedia in cursor.columnNames) {
-                    tempData[audioMedia] = helper.loadSongItem(audioMedia, cursor)
+                // For each item(song) inside this "cursor", take one and "format"
+                // into a 'Map<String, dynamic>'.
+                while (cursor != null && cursor.moveToNext()) {
+                    val tempData: MutableMap<String, Any?> = HashMap()
+
+                    for (audioMedia in cursor.columnNames) {
+                        tempData[audioMedia] = helper.loadSongItem(audioMedia, cursor)
+                    }
+
+                    //Get a extra information from audio, e.g: extension, uri, etc..
+                    val tempExtraData = helper.loadSongExtraInfo(uri, tempData)
+                    tempData.putAll(tempExtraData)
+
+                    songList.add(tempData)
                 }
 
-                //Get a extra information from audio, e.g: extension, uri, etc..
-                val tempExtraData = helper.loadSongExtraInfo(uri, tempData)
-                tempData.putAll(tempExtraData)
-
-                songList.add(tempData)
+                // Close cursor to avoid memory leaks.
+                cursor?.close()
+            } catch (e: Exception) {
+                Log.e(TAG, "Failed to query content resolver (Permission denied?): ${e.message}")
             }
-
-            // Close cursor to avoid memory leaks.
-            cursor?.close()
+            
             return@withContext songList
         }
 }
